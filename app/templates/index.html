@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>GTNH Flow Master</title>
+    <link
+      rel="stylesheet"
+      href="{{ url_for('static', filename='css/style.css') }}"
+    />
+    <script
+      defer
+      src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"
+    ></script>
+    <script defer src="{{ url_for('static', filename='js/app.js') }}"></script>
+  </head>
+  <body>
+    <header class="app-header">
+      <h1>GTNH Flow Master</h1>
+      <p>
+        Bouw, beheer en exporteer GTNH-productiestromen zonder tekstbestanden of
+        losse scripts.
+      </p>
+    </header>
+    <main class="layout">
+      <section class="panel" aria-labelledby="settings-title">
+        <div class="panel-header">
+          <h2 id="settings-title">Instellingen</h2>
+          <div class="panel-actions">
+            <button id="load-sample" type="button" class="ghost-button">
+              Voorbeeld laden
+            </button>
+            <input
+              id="import-input"
+              type="file"
+              accept="application/json"
+              class="sr-only"
+            />
+            <button id="import-button" type="button" class="ghost-button">
+              Importeren
+            </button>
+            <button id="export-button" type="button" class="ghost-button">
+              Exporteren
+            </button>
+          </div>
+        </div>
+        <div class="panel-content">
+          <div class="field">
+            <label for="flow-title">Titel</label>
+            <input id="flow-title" type="text" placeholder="Naam van de flow" />
+          </div>
+          <div class="field">
+            <label for="flow-orientation">Oriëntatie</label>
+            <select id="flow-orientation">
+              <option value="TD">Boven naar beneden</option>
+              <option value="LR">Links naar rechts</option>
+              <option value="BT">Beneden naar boven</option>
+              <option value="RL">Rechts naar links</option>
+            </select>
+          </div>
+        </div>
+      </section>
+
+      <section class="panel" aria-labelledby="node-title">
+        <div class="panel-header">
+          <h2 id="node-title">Nodes</h2>
+        </div>
+        <form id="node-form" class="panel-content form-grid">
+          <div class="field">
+            <label for="node-key">Key</label>
+            <input id="node-key" name="key" type="text" required />
+          </div>
+          <div class="field">
+            <label for="node-label">Label</label>
+            <input id="node-label" name="label" type="text" required />
+          </div>
+          <div class="field">
+            <label for="node-kind">Type</label>
+            <select id="node-kind" name="kind">
+              <option value="process">Proces</option>
+              <option value="decision">Beslissing</option>
+              <option value="terminator">Start/Einde</option>
+              <option value="data">Data</option>
+              <option value="input">Input</option>
+              <option value="output">Output</option>
+            </select>
+          </div>
+          <div class="field field-span">
+            <label for="node-note">Notitie (optioneel)</label>
+            <textarea
+              id="node-note"
+              name="note"
+              rows="2"
+              placeholder="Extra uitleg die zichtbaar wordt bij een klik"
+            ></textarea>
+          </div>
+          <div class="field form-actions">
+            <button type="submit" class="primary">Node toevoegen</button>
+          </div>
+        </form>
+        <div class="table-wrapper">
+          <table aria-describedby="node-title">
+            <thead>
+              <tr>
+                <th scope="col">Key</th>
+                <th scope="col">Label</th>
+                <th scope="col">Type</th>
+                <th scope="col">Acties</th>
+              </tr>
+            </thead>
+            <tbody id="node-table"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="panel" aria-labelledby="edge-title">
+        <div class="panel-header">
+          <h2 id="edge-title">Verbindingen</h2>
+        </div>
+        <form id="edge-form" class="panel-content form-grid">
+          <div class="field">
+            <label for="edge-source">Bron</label>
+            <select id="edge-source" name="source"></select>
+          </div>
+          <div class="field">
+            <label for="edge-target">Doel</label>
+            <select id="edge-target" name="target"></select>
+          </div>
+          <div class="field">
+            <label for="edge-label">Label (optioneel)</label>
+            <input id="edge-label" name="label" type="text" />
+          </div>
+          <div class="field">
+            <label for="edge-style">Stijl</label>
+            <select id="edge-style" name="style">
+              <option value="solid">Normaal</option>
+              <option value="dashed">Gestreept</option>
+              <option value="thick">Dik</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="edge-direction">Richting</label>
+            <select id="edge-direction" name="direction">
+              <option value="forward">Vooruit</option>
+              <option value="backward">Achteruit</option>
+              <option value="bidirectional">Beide kanten</option>
+              <option value="none">Geen pijl</option>
+            </select>
+          </div>
+          <div class="field form-actions">
+            <button type="submit" class="primary">Verbinding toevoegen</button>
+          </div>
+        </form>
+        <div class="table-wrapper">
+          <table aria-describedby="edge-title">
+            <thead>
+              <tr>
+                <th scope="col">Bron</th>
+                <th scope="col">Doel</th>
+                <th scope="col">Label</th>
+                <th scope="col">Stijl</th>
+                <th scope="col">Richting</th>
+                <th scope="col">Acties</th>
+              </tr>
+            </thead>
+            <tbody id="edge-table"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="panel preview" aria-labelledby="preview-title">
+        <div class="panel-header">
+          <h2 id="preview-title">Voorbeeld</h2>
+        </div>
+        <div id="alert-box" role="status" aria-live="polite"></div>
+        <div id="mermaid-wrapper" class="mermaid-wrapper">
+          <div id="mermaid-diagram" class="mermaid">flowchart TD</div>
+        </div>
+        <details class="mermaid-source">
+          <summary>Mermaid broncode</summary>
+          <pre><code id="mermaid-source"></code></pre>
+        </details>
+      </section>
+    </main>
+  </body>
+</html>
