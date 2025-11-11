@@ -1,0 +1,367 @@
+<!DOCTYPE html>
+<html lang="nl">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>GTNH Flow Master</title>
+    <link
+      rel="stylesheet"
+      href="{{ url_for('static', filename='css/style.css') }}"
+    />
+    <script
+      defer
+      src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"
+    ></script>
+    <script defer src="{{ url_for('static', filename='js/app.js') }}"></script>
+  </head>
+  <body>
+    <header class="app-header">
+      <h1>GTNH Flow Master</h1>
+      <p>
+        Bereken volledige productieketens voor GregTech: New Horizons en zie
+        direct hoeveel machines, items en energie je nodig hebt.
+      </p>
+    </header>
+    <main class="layout">
+      <section class="panel" aria-labelledby="target-title">
+        <div class="panel-header">
+          <h2 id="target-title">Doeloutput</h2>
+          <div class="panel-actions">
+            <button id="load-sample" type="button" class="ghost-button">
+              Voorbeeld laden
+            </button>
+            <input
+              id="import-input"
+              type="file"
+              accept="application/json"
+              class="sr-only"
+            />
+            <button id="import-button" type="button" class="ghost-button">
+              Importeren
+            </button>
+            <button id="export-button" type="button" class="ghost-button">
+              Exporteren
+            </button>
+          </div>
+        </div>
+        <form id="target-form" class="panel-content target-grid">
+          <div class="field">
+            <label for="target-item">Item</label>
+            <input
+              id="target-item"
+              name="item"
+              type="text"
+              placeholder="Bijvoorbeeld Toluene"
+              required
+            />
+          </div>
+          <div class="field">
+            <label for="target-amount">Hoeveelheid</label>
+            <input
+              id="target-amount"
+              name="amount"
+              type="number"
+              min="0"
+              step="0.01"
+              value="1"
+              required
+            />
+          </div>
+          <div class="field form-actions">
+            <button type="submit" class="primary">Bereken plan</button>
+          </div>
+        </form>
+      </section>
+
+      <section class="panel" aria-labelledby="catalog-title">
+        <div class="panel-header">
+          <h2 id="catalog-title">GregTech recepten</h2>
+        </div>
+        <div class="panel-content catalog-grid">
+          <div class="field">
+            <label for="catalog-machine">Machine</label>
+            <select id="catalog-machine">
+              <option value="">Kies een machine</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="catalog-recipe">Recept</label>
+            <select id="catalog-recipe" disabled>
+              <option value="">Selecteer eerst een machine</option>
+            </select>
+          </div>
+          <div class="field form-actions">
+            <button id="catalog-add" type="button" class="ghost-button" disabled>
+              Recept toevoegen
+            </button>
+          </div>
+        </div>
+        <p id="catalog-info" class="catalog-info">
+          Kies een machine om de bijbehorende GregTech-recepten te bekijken.
+        </p>
+      </section>
+
+      <section class="panel" aria-labelledby="recipe-title">
+        <div class="panel-header">
+          <h2 id="recipe-title">Recept toevoegen</h2>
+        </div>
+        <form id="recipe-form" class="panel-content recipe-grid">
+          <input id="recipe-index" type="hidden" name="index" value="" />
+          <div class="field">
+            <label for="recipe-id">ID</label>
+            <input
+              id="recipe-id"
+              name="id"
+              type="text"
+              placeholder="Unieke sleutel"
+              required
+            />
+          </div>
+          <div class="field">
+            <label for="recipe-machine">Machine</label>
+            <input
+              id="recipe-machine"
+              name="machine"
+              type="text"
+              placeholder="Bijv. Chemical Reactor"
+              required
+            />
+          </div>
+          <div class="field">
+            <label for="recipe-tier">Tier</label>
+            <select id="recipe-tier" name="tier" required>
+              <option value="" disabled selected>Kies een tier</option>
+            </select>
+            <input
+              id="recipe-tier-custom"
+              type="text"
+              class="hidden"
+              placeholder="Eigen tier"
+            />
+          </div>
+          <div class="field">
+            <label for="recipe-coils">Coils (optioneel)</label>
+            <select id="recipe-coils" name="coils">
+              <option value="">Geen coils</option>
+            </select>
+            <input
+              id="recipe-coils-custom"
+              type="text"
+              class="hidden"
+              placeholder="Eigen coil"
+            />
+          </div>
+          <div class="field">
+            <label for="recipe-heat">Warmte (optioneel)</label>
+            <input
+              id="recipe-heat"
+              name="heat"
+              type="number"
+              min="0"
+              step="1"
+            />
+          </div>
+          <div class="field">
+            <label for="recipe-eut">EU/t</label>
+            <input
+              id="recipe-eut"
+              name="eu_per_tick"
+              type="number"
+              min="0"
+              step="0.01"
+              required
+            />
+          </div>
+          <div class="field">
+            <label for="recipe-duration">Duur (s)</label>
+            <input
+              id="recipe-duration"
+              name="duration"
+              type="number"
+              min="0"
+              step="1"
+              required
+            />
+          </div>
+
+          <fieldset class="field field-span">
+            <legend>Inputs</legend>
+            <div class="ingredient-grid">
+              <input
+                id="input-item"
+                type="text"
+                placeholder="Itemnaam"
+              />
+              <input
+                id="input-amount"
+                type="number"
+                min="0"
+                step="0.01"
+                placeholder="Hoeveelheid"
+              />
+              <button id="add-input" type="button" class="ghost-button">
+                Toevoegen
+              </button>
+            </div>
+            <ul id="input-list" class="ingredient-list"></ul>
+          </fieldset>
+
+          <fieldset class="field field-span">
+            <legend>Outputs</legend>
+            <div class="ingredient-grid">
+              <input
+                id="output-item"
+                type="text"
+                placeholder="Itemnaam"
+              />
+              <input
+                id="output-amount"
+                type="number"
+                min="0"
+                step="0.01"
+                placeholder="Hoeveelheid"
+              />
+              <button id="add-output" type="button" class="ghost-button">
+                Toevoegen
+              </button>
+            </div>
+            <ul id="output-list" class="ingredient-list"></ul>
+          </fieldset>
+
+          <div class="field form-actions">
+            <button type="submit" class="primary">Recept opslaan</button>
+            <button
+              id="recipe-cancel"
+              type="button"
+              class="ghost-button hidden"
+            >
+              Bewerken annuleren
+            </button>
+          </div>
+        </form>
+      </section>
+
+      <section class="panel" aria-labelledby="recipe-table-title">
+        <div class="panel-header">
+          <h2 id="recipe-table-title">Beschikbare recepten</h2>
+        </div>
+        <div class="table-wrapper">
+          <table aria-describedby="recipe-table-title">
+            <thead>
+              <tr>
+                <th scope="col">ID</th>
+                <th scope="col">Machine</th>
+                <th scope="col">Tier</th>
+                <th scope="col">Inputs</th>
+                <th scope="col">Outputs</th>
+                <th scope="col">EU/t</th>
+                <th scope="col">Duur (s)</th>
+                <th scope="col">Acties</th>
+              </tr>
+            </thead>
+            <tbody id="recipe-table"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="panel preview" aria-labelledby="preview-title">
+        <div class="panel-header">
+          <h2 id="preview-title">Diagram &amp; meldingen</h2>
+        </div>
+        <div id="alert-box" role="status" aria-live="polite"></div>
+        <div id="mermaid-wrapper" class="mermaid-wrapper">
+          <div id="mermaid-diagram" class="mermaid">flowchart TD</div>
+        </div>
+        <details class="mermaid-source">
+          <summary>Mermaid broncode</summary>
+          <pre><code id="mermaid-source"></code></pre>
+        </details>
+      </section>
+
+      <section class="panel" aria-labelledby="machines-title">
+        <div class="panel-header">
+          <h2 id="machines-title">Machineoverzicht</h2>
+        </div>
+        <div class="table-wrapper">
+          <table aria-describedby="machines-title">
+            <thead>
+              <tr>
+                <th scope="col">Machine</th>
+                <th scope="col">Tier</th>
+                <th scope="col">Coils / Warmte</th>
+                <th scope="col">Machines</th>
+                <th scope="col">Duur (s)</th>
+                <th scope="col">Actief (s)</th>
+                <th scope="col">EU/t</th>
+                <th scope="col">Gem. EU/t</th>
+                <th scope="col">Piek EU/t</th>
+                <th scope="col">Totale EU</th>
+              </tr>
+            </thead>
+            <tbody id="machine-table"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="panel" aria-labelledby="energy-title">
+        <div class="panel-header">
+          <h2 id="energy-title">Energiestatistieken</h2>
+        </div>
+        <div class="energy-summary">
+          <div>
+            <span>Gemiddelde EU/t</span>
+            <strong id="energy-average">-</strong>
+          </div>
+          <div>
+            <span>Piek EU/t</span>
+            <strong id="energy-peak">-</strong>
+          </div>
+          <div>
+            <span>Gemiddelde ampère</span>
+            <strong id="energy-average-amps">-</strong>
+          </div>
+          <div>
+            <span>Piek ampère</span>
+            <strong id="energy-peak-amps">-</strong>
+          </div>
+        </div>
+        <div class="table-wrapper">
+          <table aria-describedby="energy-title">
+            <thead>
+              <tr>
+                <th scope="col">Tier</th>
+                <th scope="col">Voltage</th>
+                <th scope="col">Machines</th>
+                <th scope="col">Gem. EU/t</th>
+                <th scope="col">Piek EU/t</th>
+                <th scope="col">Gem. ampère</th>
+                <th scope="col">Piek ampère</th>
+              </tr>
+            </thead>
+            <tbody id="energy-table"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="panel" aria-labelledby="resources-title">
+        <div class="panel-header">
+          <h2 id="resources-title">Grondstoffen &amp; bijproducten</h2>
+        </div>
+        <div class="resource-columns">
+          <div>
+            <h3>Benodigde inputs</h3>
+            <ul id="raw-list" class="resource-list"></ul>
+          </div>
+          <div>
+            <h3>Productie</h3>
+            <ul id="produced-list" class="resource-list"></ul>
+          </div>
+          <div>
+            <h3>Bijproducten</h3>
+            <ul id="byproduct-list" class="resource-list"></ul>
+          </div>
+        </div>
+      </section>
+    </main>
+  </body>
+</html>

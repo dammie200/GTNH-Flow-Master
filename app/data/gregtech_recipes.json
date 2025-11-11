@@ -1,0 +1,85 @@
+[
+  {
+    "id": "heavy_oil_distillation",
+    "machine": "Distillation Tower",
+    "tier": "HV",
+    "coils": null,
+    "heat": null,
+    "eu_per_tick": 1920,
+    "duration": 24,
+    "inputs": [
+      { "item": "Heavy Fuel", "amount": 1000 }
+    ],
+    "outputs": [
+      { "item": "Light Fuel", "amount": 350 },
+      { "item": "Naphtha", "amount": 250 },
+      { "item": "Toluene", "amount": 150 }
+    ]
+  },
+  {
+    "id": "naphtha_split_toluene",
+    "machine": "Chemical Reactor",
+    "tier": "MV",
+    "coils": null,
+    "heat": null,
+    "eu_per_tick": 120,
+    "duration": 20,
+    "inputs": [
+      { "item": "Naphtha", "amount": 100 },
+      { "item": "Hydrogen", "amount": 100 }
+    ],
+    "outputs": [
+      { "item": "Toluene", "amount": 40 },
+      { "item": "Butadiene", "amount": 30 }
+    ]
+  },
+  {
+    "id": "water_electrolysis",
+    "machine": "Electrolyzer",
+    "tier": "LV",
+    "coils": null,
+    "heat": null,
+    "eu_per_tick": 30,
+    "duration": 20,
+    "inputs": [
+      { "item": "Water", "amount": 1000 }
+    ],
+    "outputs": [
+      { "item": "Hydrogen", "amount": 200 },
+      { "item": "Oxygen", "amount": 100 }
+    ]
+  },
+  {
+    "id": "industrial_tnt_mix",
+    "machine": "Mixer",
+    "tier": "HV",
+    "coils": null,
+    "heat": null,
+    "eu_per_tick": 480,
+    "duration": 16,
+    "inputs": [
+      { "item": "Toluene", "amount": 72 },
+      { "item": "Nitric Acid", "amount": 144 },
+      { "item": "Cellulose Pulp", "amount": 16 }
+    ],
+    "outputs": [
+      { "item": "Industrial TNT (Fluid)", "amount": 144 }
+    ]
+  },
+  {
+    "id": "industrial_tnt_solidify",
+    "machine": "Fluid Solidifier",
+    "tier": "HV",
+    "coils": null,
+    "heat": null,
+    "eu_per_tick": 480,
+    "duration": 8,
+    "inputs": [
+      { "item": "Industrial TNT (Fluid)", "amount": 144 },
+      { "item": "Shape Mold (TNT)", "amount": 1 }
+    ],
+    "outputs": [
+      { "item": "Industrial TNT", "amount": 4 }
+    ]
+  }
+]
