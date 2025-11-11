@@ -11,6 +11,7 @@ Een webtool om volledige productieketens voor **GregTech: New Horizons** te plan
 - Gedetailleerd machineoverzicht plus een energiepaneel met gemiddelde/piek EU/t en ampère per tier.
 - Overzichten voor benodigde inputs, eindproducten en bijproducten zodat je exact weet wat je nodig hebt.
 - Ingebouwde GregTech-receptcatalogus om snel recepten te kiezen en aan te passen.
+- Automatisch invullen van plannen op basis van de GregTech-catalogus, inclusief item-suggesties en keuze van de beste recepten.
 - Import/export van plannen als JSON en een voorgeconfigureerd voorbeeld om snel te starten.
 
 ## Vereisten
@@ -34,11 +35,11 @@ De applicatie draait standaard op <http://localhost:8000>. Open deze URL in een 
 
 ## Gebruik
 
-1. Vul je target item en gewenste hoeveelheid in bovenaan de pagina.
-2. Voeg voor elke machine in de keten een recept toe met inputs, outputs, tier, coils/heat, EU/t en duur (in seconden). Je kunt bestaande recepten bewerken via de tabel of een bewerking annuleren met de knop naast het formulier.
-3. Gebruik de sectie **GregTech recepten** om snel een recept uit de catalogus te selecteren en direct in het formulier te laden.
+1. Vul je target item en gewenste hoeveelheid in bovenaan de pagina. Het itemveld toont suggesties uit de GregTech-catalogus.
+2. Gebruik **Automatisch invullen** om de keten direct te laten vullen met passende GregTech-recepten. Recepten voor ontbrekende items markeert de tool zodat je ze handmatig kunt toevoegen.
+3. Voeg indien nodig extra recepten toe of bewerk bestaande recepten via de tabel. Je kunt recepten uit de catalogus laden en aanpassen.
 4. Klik op **Bereken plan** om automatisch alle benodigde machines, grondstoffen, energie en ampère te laten uitrekenen.
-5. Bekijk het diagram, het machine- en energieoverzicht en de grondstoffenlijsten voor exacte aantallen.
+5. Bekijk het diagram, het machine- en energieoverzicht en de grondstoffenlijsten voor exacte aantallen. Recepten die hetzelfde item opleveren worden nu gecombineerd in het plan.
 6. Gebruik import/export om plannen als JSON op te slaan of te delen. Met **Voorbeeld laden** verschijnt een voorbeeldplanning rond Toluene.
 
 ## Ontwikkeling

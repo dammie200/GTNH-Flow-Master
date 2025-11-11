@@ -233,6 +233,16 @@ class MachineSummary:
 
 
 @dataclass
+class RecipeCandidate:
+    recipe: RecipeModel
+    share: float
+    output_amount: float
+
+
+EPSILON = 1e-9
+
+
+@dataclass
 class PlanData:
     target_item: str
     target_amount: float
@@ -349,18 +359,29 @@ class PlanBuilder:
 
     def __init__(self, recipes: Iterable[RecipeModel]) -> None:
         self.recipes = list(recipes)
-        self.recipe_by_item: Dict[str, RecipeModel] = {}
+        self.candidates_by_item: Dict[str, List[RecipeCandidate]] = defaultdict(list)
         for recipe in self.recipes:
+            total_outputs = sum(out.amount for out in recipe.outputs)
             for output in recipe.outputs:
                 key = output.item.lower()
-                if key in self.recipe_by_item:
-                    other = self.recipe_by_item[key]
-                    msg = (
-                        "Meerdere recepten produceren hetzelfde item. "
-                        f"'{output.item}' komt voor in '{other.identifier}' en '{recipe.identifier}'."
-                    )
-                    raise ProductionError(msg)
-                self.recipe_by_item[key] = recipe
+                share = output.amount / total_outputs if total_outputs else 0.0
+                candidate = RecipeCandidate(
+                    recipe=recipe,
+                    share=share,
+                    output_amount=output.amount,
+                )
+                self.candidates_by_item[key].append(candidate)
+
+        for key, candidates in self.candidates_by_item.items():
+            candidates.sort(
+                key=lambda candidate: (
+                    candidate.share,
+                    candidate.output_amount,
+                    -candidate.recipe.duration,
+                    -candidate.recipe.eu_per_tick,
+                ),
+                reverse=True,
+            )
 
         self.raw_inputs: Dict[str, float] = defaultdict(float)
         self.produced: Dict[str, float] = defaultdict(float)
@@ -370,7 +391,7 @@ class PlanBuilder:
         self.recipe_outputs: Dict[str, Dict[str, float]] = defaultdict(lambda: defaultdict(float))
 
     def build(self, target_item: str, target_amount: float) -> PlanData:
-        if target_item.lower() not in self.recipe_by_item:
+        if target_item.lower() not in self.candidates_by_item:
             msg = f"Geen recept gevonden dat '{target_item}' produceert."
             raise ProductionError(msg)
         self._produce(target_item, target_amount, stack=tuple())
@@ -409,29 +430,47 @@ class PlanBuilder:
 
     def _produce(self, item: str, amount: float, *, stack: Tuple[str, ...]) -> None:
         key = item.lower()
-        self.demanded[item] += amount
-        if key not in self.recipe_by_item:
-            self.raw_inputs[item] += amount
+        previous_demand = self.demanded.get(item, 0.0)
+        available = max(0.0, self.produced.get(item, 0.0) - previous_demand)
+        remaining = max(0.0, amount - available)
+        self.demanded[item] = previous_demand + amount
+        if remaining <= EPSILON:
+            return
+
+        if key not in self.candidates_by_item:
+            self.raw_inputs[item] += remaining
             return
 
         if item in stack:
             chain = " -> ".join(stack + (item,))
             raise ProductionError(f"Cyclische afhankelijkheid gevonden: {chain}")
 
-        recipe = self.recipe_by_item[key]
-        output = recipe.get_output(item)
-        crafts = amount / output.amount
-        self.recipe_usage[recipe.identifier] += crafts
+        for candidate in self.candidates_by_item[key]:
+            recipe = candidate.recipe
+            output = recipe.get_output(item)
+            if output.amount <= 0:
+                continue
 
-        for out in recipe.outputs:
-            total_out = crafts * out.amount
-            self.produced[out.item] += total_out
-            self.recipe_outputs[recipe.identifier][out.item] += total_out
+            crafts = remaining / output.amount
+            self.recipe_usage[recipe.identifier] += crafts
 
-        for ing in recipe.inputs:
-            required = crafts * ing.amount
-            self.recipe_inputs[recipe.identifier][ing.item] += required
-            self._produce(ing.item, required, stack=stack + (item,))
+            for out in recipe.outputs:
+                total_out = crafts * out.amount
+                self.produced[out.item] += total_out
+                self.recipe_outputs[recipe.identifier][out.item] += total_out
+
+            for ing in recipe.inputs:
+                required = crafts * ing.amount
+                self.recipe_inputs[recipe.identifier][ing.item] += required
+                self._produce(ing.item, required, stack=stack + (item,))
+
+            produced_amount = crafts * output.amount
+            remaining = max(0.0, remaining - produced_amount)
+            if remaining <= EPSILON:
+                return
+
+        # Als geen enkele kandidaat het item kon leveren, behandel het als ruwe input.
+        self.raw_inputs[item] += remaining
 
 
 class ProductionEngine:

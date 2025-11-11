@@ -35,6 +35,7 @@
     plan: null,
     catalog: [],
     catalogByMachine: {},
+    catalogByOutput: {},
     editingIndex: null,
   };
 
@@ -56,6 +57,8 @@
   const exportButton = document.querySelector("#export-button");
   const targetItemInput = document.querySelector("#target-item");
   const targetAmountInput = document.querySelector("#target-amount");
+  const targetSuggestions = document.querySelector("#target-suggestions");
+  const autoPlanButton = document.querySelector("#auto-plan");
 
   const recipeIdInput = document.querySelector("#recipe-id");
   const recipeMachineInput = document.querySelector("#recipe-machine");
@@ -232,14 +235,18 @@
     return Number.isNaN(number) ? 0 : number;
   }
 
-  function ensureUniqueRecipeId(baseId) {
+  function ensureUniqueIdInList(baseId, list) {
     let candidate = baseId;
     let counter = 1;
-    while (state.recipes.some((recipe) => recipe.id === candidate)) {
+    while (list.some((recipe) => recipe.id === candidate)) {
       candidate = `${baseId}-${counter}`;
       counter += 1;
     }
     return candidate;
+  }
+
+  function ensureUniqueRecipeId(baseId) {
+    return ensureUniqueIdInList(baseId, state.recipes);
   }
 
   function normaliseRecipe(raw) {
@@ -765,6 +772,29 @@
     }
   }
 
+  function populateTargetSuggestions() {
+    if (!targetSuggestions) {
+      return;
+    }
+    const seen = new Map();
+    Object.values(state.catalogByOutput || {}).forEach((entry) => {
+      if (!entry || !entry.item) {
+        return;
+      }
+      const key = entry.item.toLowerCase();
+      if (!seen.has(key)) {
+        seen.set(key, entry.item);
+      }
+    });
+    const sorted = Array.from(seen.values()).sort((a, b) => a.localeCompare(b, "nl", { sensitivity: "base" }));
+    targetSuggestions.innerHTML = "";
+    sorted.forEach((item) => {
+      const option = document.createElement("option");
+      option.value = item;
+      targetSuggestions.appendChild(option);
+    });
+  }
+
   function populateCatalogRecipes(machineName) {
     catalogRecipeSelect.innerHTML = "";
     const placeholder = document.createElement("option");
@@ -851,6 +881,7 @@
         outputs: Array.isArray(entry.outputs) ? entry.outputs : [],
       }));
       state.catalogByMachine = {};
+      state.catalogByOutput = {};
       state.catalog.forEach((recipe) => {
         const name = recipe.machine || "Onbekende machine";
         const key = name.toLowerCase();
@@ -858,8 +889,21 @@
           state.catalogByMachine[key] = { name, recipes: [] };
         }
         state.catalogByMachine[key].recipes.push(recipe);
+
+        (recipe.outputs || []).forEach((output) => {
+          if (!output || !output.item) {
+            return;
+          }
+          const itemName = output.item;
+          const itemKey = itemName.toLowerCase();
+          if (!state.catalogByOutput[itemKey]) {
+            state.catalogByOutput[itemKey] = { item: itemName, recipes: [] };
+          }
+          state.catalogByOutput[itemKey].recipes.push(recipe);
+        });
       });
       populateCatalogMachines();
+      populateTargetSuggestions();
     } catch (error) {
       console.error("Kon GregTech catalogus niet laden", error);
       catalogInfo.textContent = "Kon GregTech-catalogus niet laden.";
@@ -867,6 +911,31 @@
       catalogRecipeSelect.disabled = true;
       catalogAddButton.disabled = true;
     }
+  }
+
+  function convertCatalogEntry(source, targetList = state.recipes) {
+    const list = Array.isArray(targetList) ? targetList : state.recipes;
+    const uniqueId = ensureUniqueIdInList(source.id, list);
+    return {
+      id: uniqueId,
+      machine: source.machine,
+      tier: source.tier,
+      coils: source.coils ?? null,
+      heat:
+        source.heat === undefined || source.heat === null
+          ? null
+          : Number.parseInt(source.heat, 10),
+      eu_per_tick: parseAmount(source.eu_per_tick ?? source.eut ?? 0),
+      duration: parseAmount(source.duration ?? 0),
+      inputs: (source.inputs || []).map((entry) => ({
+        item: entry.item,
+        amount: parseAmount(entry.amount ?? 0),
+      })),
+      outputs: (source.outputs || []).map((entry) => ({
+        item: entry.item,
+        amount: parseAmount(entry.amount ?? 0),
+      })),
+    };
   }
 
   function addCatalogRecipe() {
@@ -878,38 +947,135 @@
       return;
     }
 
-    const uniqueId = ensureUniqueRecipeId(source.id);
-    const recipe = {
-      id: uniqueId,
-      machine: source.machine,
-      tier: source.tier,
-      coils: source.coils ?? null,
-      heat:
-        source.heat === undefined || source.heat === null
-          ? null
-          : Number.parseInt(source.heat, 10),
-      eu_per_tick: parseAmount(source.eu_per_tick ?? 0),
-      duration: parseAmount(source.duration ?? 0),
-      inputs: (source.inputs || []).map((entry) => ({
-        item: entry.item,
-        amount: parseAmount(entry.amount ?? 0),
-      })),
-      outputs: (source.outputs || []).map((entry) => ({
-        item: entry.item,
-        amount: parseAmount(entry.amount ?? 0),
-      })),
-    };
-
+    const recipe = convertCatalogEntry(source, state.recipes);
     state.recipes.push(recipe);
     renderRecipeTable();
     resetPlanViews();
     startEditingRecipe(state.recipes.length - 1, { silent: true });
     setMessage(
-      uniqueId === source.id
+      recipe.id === source.id
         ? `GregTech-recept '${source.id}' toegevoegd en klaar om te bewerken.`
-        : `GregTech-recept '${source.id}' toegevoegd als '${uniqueId}' en klaar om te bewerken.`,
+        : `GregTech-recept '${source.id}' toegevoegd als '${recipe.id}' en klaar om te bewerken.`,
       "info"
     );
+  }
+
+  function computeOutputPreference(recipe, itemName) {
+    const outputs = Array.isArray(recipe.outputs) ? recipe.outputs : [];
+    const total = outputs.reduce((sum, entry) => sum + parseAmount(entry.amount ?? 0), 0);
+    const match = outputs.find(
+      (entry) => entry && typeof entry.item === "string" && entry.item.toLowerCase() === itemName.toLowerCase()
+    );
+    const amount = match ? parseAmount(match.amount ?? 0) : 0;
+    const share = total > 0 ? amount / total : 0;
+    return { amount, share };
+  }
+
+  function selectPreferredCatalogRecipe(itemName) {
+    if (!itemName) {
+      return null;
+    }
+    const entry = state.catalogByOutput[itemName.toLowerCase()];
+    if (!entry || !Array.isArray(entry.recipes) || !entry.recipes.length) {
+      return null;
+    }
+    const sorted = entry.recipes.slice().sort((a, b) => {
+      const prefA = computeOutputPreference(a, itemName);
+      const prefB = computeOutputPreference(b, itemName);
+      if (prefA.share !== prefB.share) {
+        return prefB.share - prefA.share;
+      }
+      if (prefA.amount !== prefB.amount) {
+        return prefB.amount - prefA.amount;
+      }
+      const eutA = parseAmount(a.eu_per_tick ?? a.eut ?? 0);
+      const eutB = parseAmount(b.eu_per_tick ?? b.eut ?? 0);
+      if (eutA !== eutB) {
+        return eutA - eutB;
+      }
+      const durationA = parseAmount(a.duration ?? 0);
+      const durationB = parseAmount(b.duration ?? 0);
+      return durationA - durationB;
+    });
+    return sorted[0] ?? null;
+  }
+
+  function autoPlanFromCatalog() {
+    if (!state.catalog.length) {
+      setMessage("Catalogus nog niet geladen. Wacht even en probeer opnieuw.", "error");
+      return;
+    }
+    const targetItem = targetItemInput.value.trim();
+    if (!targetItem) {
+      setMessage("Vul een doelitem in voordat je het plan laat invullen.", "error");
+      return;
+    }
+    const amountValue = parseAmount(targetAmountInput.value ?? 0);
+    if (amountValue <= 0) {
+      setMessage("Vul een hoeveelheid groter dan nul in.", "error");
+      return;
+    }
+
+    const collected = new Map();
+    const missing = new Set();
+    const visiting = new Set();
+    const resolved = new Set();
+
+    function visit(itemName) {
+      const key = itemName.toLowerCase();
+      if (resolved.has(key) || visiting.has(key)) {
+        return;
+      }
+      visiting.add(key);
+      const recipe = selectPreferredCatalogRecipe(itemName);
+      if (!recipe) {
+        missing.add(itemName);
+        visiting.delete(key);
+        resolved.add(key);
+        return;
+      }
+      if (!collected.has(recipe.id)) {
+        collected.set(recipe.id, recipe);
+      }
+      const inputs = Array.isArray(recipe.inputs) ? recipe.inputs : [];
+      inputs.forEach((input) => {
+        if (!input || typeof input.item !== "string") {
+          return;
+        }
+        visit(input.item);
+      });
+      visiting.delete(key);
+      resolved.add(key);
+    }
+
+    visit(targetItem);
+
+    if (!collected.size) {
+      setMessage(`Geen GregTech-recepten gevonden voor '${targetItem}'.`, "error");
+      return;
+    }
+
+    const newRecipes = [];
+    collected.forEach((source) => {
+      const recipe = convertCatalogEntry(source, newRecipes);
+      newRecipes.push(recipe);
+    });
+
+    state.recipes = newRecipes;
+    renderRecipeTable();
+    resetPlanViews();
+    resetRecipeEditor();
+
+    if (missing.size) {
+      const missingList = Array.from(missing).sort((a, b) => a.localeCompare(b, "nl", { sensitivity: "base" }));
+      setMessage(
+        `Plan automatisch ingevuld. Geen catalogusrecept voor: ${missingList.join(", ")}.`,
+        "warning"
+      );
+      return;
+    }
+
+    setMessage("Plan automatisch ingevuld. Controleer de recepten en bereken het plan.", "info");
   }
 
   function exportData() {
@@ -1044,6 +1210,9 @@
   });
 
   catalogAddButton.addEventListener("click", addCatalogRecipe);
+  if (autoPlanButton) {
+    autoPlanButton.addEventListener("click", autoPlanFromCatalog);
+  }
 
   importButton.addEventListener("click", () => importInput.click());
   exportButton.addEventListener("click", exportData);

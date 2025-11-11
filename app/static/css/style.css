@@ -134,6 +134,10 @@ body {
 
 .form-actions {
   align-self: end;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  justify-content: flex-end;
 }
 
 button {
